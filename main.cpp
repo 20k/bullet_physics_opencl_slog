@@ -117,16 +117,12 @@ struct opencl_base
 
         int errNum = 0;
 
-        //cl_program rbProg = 0;
-
         cl::program prog(ctx, s_rigidBodyKernelString, false);
         prog.build_with(ctx, "");
 
         cl::kernel copyTransformsToVBOKernel(prog, "copyTransformsToVBOKernel");
 
         data->m_copyTransformsToVBOKernel = copyTransformsToVBOKernel.ckernel;
-
-        #endif // 0
 
 
         data->m_config.m_maxConvexBodies = b3Max(data->m_config.m_maxConvexBodies,gGpuArraySizeX*gGpuArraySizeY*gGpuArraySizeZ+10);
