@@ -197,14 +197,14 @@ struct opencl_base
 
         int index = 0;
 
-        for(int i=0; i < 5; i++)
+        for(int i=0; i < 50; i++)
         {
-            float rad = 5.f;
+            float rad = 1.f;
             float mass = 1.f;
 
             int colIndex = m_data->m_np->registerSphereShape(rad);
 
-            b3Vector3 position = b3MakeVector3(i * 20 + 500,600,0);
+            b3Vector3 position = b3MakeVector3(i * 2 + 500, 600,0);
 
             b3Quaternion orn(0,0,0,1);
 
@@ -215,6 +215,15 @@ struct opencl_base
             index++;
         }
 
+        int colIndex = m_data->m_np->registerSphereShape(100.f);
+
+        b3Vector3 position = b3MakeVector3(500, 0, 0);
+
+        b3Quaternion orn(0,0,0,1);
+
+        b3Vector4 scaling = b3MakeVector4(100, 100, 100, 1.f);
+
+        m_data->m_rigidBodyPipeline->registerPhysicsInstance(0.f, position, orn, colIndex, index + 1, false);
 
         m_data->m_rigidBodyPipeline->writeAllInstancesToGpu();
 		np->writeAllBodiesToGpu();
@@ -293,19 +302,19 @@ struct opencl_base
             b3GpuNarrowPhaseInternalData*	npData = m_data->m_np->getInternalData();
             npData->m_bodyBufferGPU->copyToHost(*npData->m_bodyBufferCPU);
 
+            sf::CircleShape circle;
+            float radius = 5;
+            circle.setRadius(radius);
+            circle.setOrigin(radius, radius);
+
             for(int i=0; i < num_objects; i++)
             {
                 b3Vector4 pos = (const b3Vector4&)npData->m_bodyBufferCPU->at(i).m_pos;
 
-                printf("%f %f %f\n", pos.x, pos.y, pos.z);
+                //printf("%f %f %f\n", pos.x, pos.y, pos.z);
 
-                float radius = 5;
-
-                sf::CircleShape circle;
-                circle.setRadius(radius);
 
                 circle.setPosition(sf::Vector2f(pos.x, pos.y));
-                circle.setOrigin(radius, radius);
 
                 win.draw(circle);
             }
