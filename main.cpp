@@ -65,11 +65,13 @@ __kernel void
 }
 
 __kernel
-void hacky_render(__read_only image2d_t tex, __write_only image2d_t screen, __global Body* gBodies, int body_idx)
+void hacky_render(__read_only image2d_t tex, __write_only image2d_t screen, __global Body* gBodies)
 {
     int2 id;
     id.x = get_global_id(0);
     id.y = get_global_id(1);
+
+    int body_idx = get_global_id(2);
 
     int2 dim = get_image_dim(tex);
 
@@ -84,8 +86,15 @@ void hacky_render(__read_only image2d_t tex, __write_only image2d_t screen, __gl
 
     int2 pos = convert_int2(gBodies[body_idx].m_pos.xy);
 
+    int2 offset = convert_int2(id + pos);
+
+    int2 sdim = get_image_dim(screen);
+
+    if(any(offset < 0) || any(offset >= sdim))
+        return;
+
     ///check this works
-    write_imagef(screen, convert_int2(id + pos), convert_float4(val) / 255.f);
+    write_imagef(screen, offset, convert_float4(val) / 255.f);
 }
 );
 
@@ -136,9 +145,9 @@ struct session_data
 	}
 };
 
-int gGpuArraySizeX = 45;
-int gGpuArraySizeY = 55;
-int gGpuArraySizeZ = 45;
+int gGpuArraySizeX = 60;
+int gGpuArraySizeY = 60;
+int gGpuArraySizeZ = 60;
 
 extern int b3OpenCLUtils_clewInit();
 
@@ -217,7 +226,7 @@ struct opencl_base
         b3Vector3 position = b3MakeVector3(pos.x(), pos.y(), pos.z());
         b3Quaternion orn(0,0,0,1);
 
-        int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(0.f,position,orn,colIndex,index,false);
+        int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(mass,position,orn,colIndex,-1,false);
 
         index++;
     }
@@ -232,7 +241,27 @@ struct opencl_base
 
         b3Vector4 scaling = b3MakeVector4(radius, radius, radius, 1.f);
 
-        int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(mass, position, orn, colIndex, index, false);
+        int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(mass, position, orn, colIndex, -1, false);
+
+        index++;
+    }
+
+    void make_plane(float mass, vec3f pos, float plane_constant, vec3f normal, int& index)
+    {
+        int colIndex = m_data->m_np->registerPlaneShape(b3MakeVector3(normal.x(), normal.y(), normal.z()), plane_constant);
+
+        make_obj(0.f, pos, plane_constant, index, colIndex);
+    }
+
+    void make_obj(float mass, vec3f pos, vec3f half_extents, int& index, int colIndex)
+    {
+        b3Vector3 position = b3MakeVector3(pos.x(), pos.y(), pos.z());
+
+        b3Quaternion orn(0,0,0,1);
+
+        b3Vector4 scaling = b3MakeVector4(half_extents.x(), half_extents.y(), half_extents.z(), 1.f);
+
+        int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(mass, position, orn, colIndex, -1, false);
 
         index++;
     }
@@ -257,9 +286,9 @@ struct opencl_base
 
         m_data->m_copyTransformsToVBOKernel = copyTransformsToVBOKernel.ckernel;
 
-
         m_data->m_config.m_maxConvexBodies = b3Max(m_data->m_config.m_maxConvexBodies,gGpuArraySizeX*gGpuArraySizeY*gGpuArraySizeZ+10);
 		m_data->m_config.m_maxConvexShapes = m_data->m_config.m_maxConvexBodies;
+
 		int maxPairsPerBody = 16;
 		m_data->m_config.m_maxBroadphasePairs = maxPairsPerBody*m_data->m_config.m_maxConvexBodies;
 		m_data->m_config.m_maxContactCapacity = m_data->m_config.m_maxBroadphasePairs;
@@ -268,7 +297,7 @@ struct opencl_base
 		b3GpuBroadphaseInterface* bp =0;
 
 
-		bool useUniformGrid = false;
+		bool useUniformGrid = true;
 
 		if (useUniformGrid)
 		{
@@ -296,12 +325,40 @@ struct opencl_base
 
         int index = 0;
 
-        for(int i=0; i < 50; i++)
+        float radius = 1.f;
+
+        /*int colIndex = m_data->m_np->registerSphereShape(radius);
+
+        for(int i=0; i < 5000; i++)
         {
-            make_sphere(1.f, {i * 2 + 400, 600, 0.f}, 21.f, index);
+            //make_sphere(1.f, {i * 2 + 400, 600, 0.f}, 21.f, index);
+
+            //make_sphere(1, randv<3, float>(0, 600), 1, index);
+
+            make_obj(1.f, randv<3, float>(0, 600), radius, index, colIndex);
+        }*/
+
+        for(int i=0; i < 5000; i++)
+        {
+            make_sphere(10.f, randf<3, float>(0, 600), radius/2, index);
         }
 
-        make_cube(0.f, {0,0,0}, {4000, 1, 4000}, index);
+        //make_plane(0.f, {0, 0, 0}, 1.f, {0, 1, 0}, index);
+
+        ///for some reason, 0 mass objects make everything explode
+        ///maybe we're getting actual divide by 0s
+        ///anyway at least its known
+        for(int x=0; x < 20; x++)
+        {
+            for(int y=0; y < 20; y++)
+            {
+                float mult = 20.f;
+
+                //make_cube(0.f, {x*mult, 0, y*mult}, {mult, mult, mult}, index);
+            }
+        }
+
+        //make_cube(0.f, {0,0,0}, {4000, 1, 4000}, index);
 
         m_data->m_rigidBodyPipeline->writeAllInstancesToGpu();
 		np->writeAllBodiesToGpu();
@@ -313,7 +370,6 @@ struct opencl_base
         int num_objects = m_data->m_rigidBodyPipeline->getNumBodies();
 
         {
-            B3_PROFILE("stepSimulation");
             m_data->m_rigidBodyPipeline->stepSimulation(timestep_s);
         }
 
@@ -382,23 +438,22 @@ struct opencl_base
 
         int num_objects = m_data->m_rigidBodyPipeline->getNumBodies();
 
-        printf("%i nobj\n", num_objects);
+        //printf("%i nobj\n", num_objects);
 
         if(num_objects)
         {
-            b3GpuNarrowPhaseInternalData*	npData = m_data->m_np->getInternalData();
-
             cl_mem buffer = m_data->m_rigidBodyPipeline->getBodyBuffer();
 
-            for(int i=0; i < num_objects; i++)
+            //for(int i=0; i < num_objects; i++)
             {
                 cl::args args;
+                args.arg_list.reserve(3);
                 args.push_back(circle_tex);
                 args.push_back(screen_tex);
                 args.push_back(buffer);
-                args.push_back(i);
+                //args.push_back(i);
 
-                cqueue.exec(program, "hacky_render", args, {10, 10}, {16, 16});
+                cqueue.exec(program, "hacky_render", args, {10, 10, num_objects}, {16, 16, 1});
             }
 
 
@@ -438,13 +493,15 @@ int main()
     cl::context ctx;
     cl::command_queue cqueue(ctx);
 
+    cl::command_queue phys(ctx);
+
 
     cl::program prog(ctx, s_rigidBodyKernelString, false);
     prog.build_with(ctx, "");
 
 
     opencl_base base;
-    base.initCL(ctx, cqueue, prog);
+    base.initCL(ctx, phys, prog);
 
     sf::RenderTexture tex;
     tex.create(10, 10);
@@ -497,10 +554,12 @@ int main()
 
         if(key.isKeyPressed(sf::Keyboard::N))
         {
-            std::cout << timestep_s << std::endl;
+            std::cout << timestep_s * 1000. << std::endl;
         }
 
         win.display();
         win.clear();
+
+        cqueue.block();
     }
 }
