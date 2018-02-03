@@ -1,0 +1,3 @@
+[submodule "deps/ocl"]
+	path = deps/ocl
+	url = https://github.com/20k/funopenclwrapper
