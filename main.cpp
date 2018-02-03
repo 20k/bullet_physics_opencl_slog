@@ -93,7 +93,7 @@ struct session_data
 	int m_pickGraphicsShapeInstance;
 	b3Config m_config;
 
-	GpuRigidBodyDemoInternalData()
+	session_data()
 	{
 	    m_instancePosOrnColor = nullptr;
 	    m_rigidBodyPipeline = nullptr;
@@ -122,7 +122,7 @@ struct opencl_base
 {
     struct GpuDemoInternalData*	m_clData;
 
-    session_data* data;
+    session_data* m_data;
 
     void setupScene()
     {
@@ -133,7 +133,7 @@ struct opencl_base
     {
         m_clData = new GpuDemoInternalData();
 
-        data = new session_data;
+        m_data = new session_data;
 
         b3OpenCLUtils_clewInit();
 
@@ -155,16 +155,16 @@ struct opencl_base
 
         cl::kernel copyTransformsToVBOKernel(prog, "copyTransformsToVBOKernel");
 
-        data->m_copyTransformsToVBOKernel = copyTransformsToVBOKernel.ckernel;
+        m_data->m_copyTransformsToVBOKernel = copyTransformsToVBOKernel.ckernel;
 
 
-        data->m_config.m_maxConvexBodies = b3Max(data->m_config.m_maxConvexBodies,gGpuArraySizeX*gGpuArraySizeY*gGpuArraySizeZ+10);
-		data->m_config.m_maxConvexShapes = data->m_config.m_maxConvexBodies;
+        m_data->m_config.m_maxConvexBodies = b3Max(m_data->m_config.m_maxConvexBodies,gGpuArraySizeX*gGpuArraySizeY*gGpuArraySizeZ+10);
+		m_data->m_config.m_maxConvexShapes = m_data->m_config.m_maxConvexBodies;
 		int maxPairsPerBody = 16;
-		data->m_config.m_maxBroadphasePairs = maxPairsPerBody*data->m_config.m_maxConvexBodies;
-		data->m_config.m_maxContactCapacity = data->m_config.m_maxBroadphasePairs;
+		m_data->m_config.m_maxBroadphasePairs = maxPairsPerBody*m_data->m_config.m_maxConvexBodies;
+		m_data->m_config.m_maxContactCapacity = m_data->m_config.m_maxBroadphasePairs;
 
-        b3GpuNarrowPhase* np = new b3GpuNarrowPhase(m_clData->m_clContext,m_clData->m_clDevice,m_clData->m_clQueue,data->m_config);
+        b3GpuNarrowPhase* np = new b3GpuNarrowPhase(m_clData->m_clContext,m_clData->m_clDevice,m_clData->m_clQueue,m_data->m_config);
 		b3GpuBroadphaseInterface* bp =0;
 
 		bool useUniformGrid = false;
@@ -177,15 +177,15 @@ struct opencl_base
 			bp = new b3GpuSapBroadphase(m_clData->m_clContext,m_clData->m_clDevice,m_clData->m_clQueue);
 		}
 
-		data->m_np = np;
-		data->m_bp = bp;
-		data->m_broadphaseDbvt = new b3DynamicBvhBroadphase(data->m_config.m_maxConvexBodies);
+		m_data->m_np = np;
+		m_data->m_bp = bp;
+		m_data->m_broadphaseDbvt = new b3DynamicBvhBroadphase(m_data->m_config.m_maxConvexBodies);
 
-		data->m_rigidBodyPipeline = new b3GpuRigidBodyPipeline(m_clData->m_clContext,m_clData->m_clDevice,m_clData->m_clQueue, np, bp,data->m_broadphaseDbvt,data->m_config);
+		m_data->m_rigidBodyPipeline = new b3GpuRigidBodyPipeline(m_clData->m_clContext,m_clData->m_clDevice,m_clData->m_clQueue, np, bp,m_data->m_broadphaseDbvt,m_data->m_config);
 
 		setupScene();
 
-		data->m_rigidBodyPipeline->writeAllInstancesToGpu();
+		m_data->m_rigidBodyPipeline->writeAllInstancesToGpu();
 		np->writeAllBodiesToGpu();
 		bp->writeAabbsToGpu();
 
