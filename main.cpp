@@ -65,23 +65,51 @@ __kernel void
 }
 );
 
-
 static const char* dname = "Phony device";
-
-/*struct b3Config
-{
-    int m_maxConvexBodies = 50;
-    int m_maxConvexShapes = 50;
-    int m_maxBroadphasePairs = 8 * m_maxConvexBodies;
-    int m_maxContactCapacity = m_maxBroadphasePairs;
-
-};*/
 
 struct session_data
 {
     cl_kernel m_copyTransformsToVBOKernel;
 
-    b3Config m_config;
+    b3OpenCLArray<b3Vector4>*	m_instancePosOrnColor;
+
+	class b3GpuRigidBodyPipeline* m_rigidBodyPipeline;
+
+	class b3GpuNarrowPhase* m_np;
+	class b3GpuBroadphaseInterface* m_bp;
+	class b3DynamicBvhBroadphase* m_broadphaseDbvt;
+
+	b3Vector3 m_pickPivotInA;
+	b3Vector3 m_pickPivotInB;
+	float m_pickDistance;
+	int m_pickBody;
+	int	m_pickConstraint;
+
+	int m_altPressed;
+	int m_controlPressed;
+
+	int m_pickFixedBody;
+	int m_pickGraphicsShapeIndex;
+	int m_pickGraphicsShapeInstance;
+	b3Config m_config;
+
+	GpuRigidBodyDemoInternalData()
+	{
+	    m_instancePosOrnColor = nullptr;
+	    m_rigidBodyPipeline = nullptr;
+
+        m_copyTransformsToVBOKernel = 0;
+		m_np = 0;
+		m_bp = 0;
+		m_broadphaseDbvt = 0;
+		m_pickConstraint = -1;
+		m_pickFixedBody = -1;
+		m_pickGraphicsShapeIndex = -1;
+		m_pickGraphicsShapeInstance = -1;
+		m_pickBody = -1;
+		m_altPressed = 0;
+		m_controlPressed = 0;
+	}
 };
 
 int gGpuArraySizeX = 45;
@@ -95,6 +123,11 @@ struct opencl_base
     struct GpuDemoInternalData*	m_clData;
 
     session_data* data;
+
+    void setupScene()
+    {
+
+    }
 
     void initCL()
     {
@@ -143,6 +176,19 @@ struct opencl_base
 		{
 			bp = new b3GpuSapBroadphase(m_clData->m_clContext,m_clData->m_clDevice,m_clData->m_clQueue);
 		}
+
+		data->m_np = np;
+		data->m_bp = bp;
+		data->m_broadphaseDbvt = new b3DynamicBvhBroadphase(data->m_config.m_maxConvexBodies);
+
+		data->m_rigidBodyPipeline = new b3GpuRigidBodyPipeline(m_clData->m_clContext,m_clData->m_clDevice,m_clData->m_clQueue, np, bp,data->m_broadphaseDbvt,data->m_config);
+
+		setupScene();
+
+		data->m_rigidBodyPipeline->writeAllInstancesToGpu();
+		np->writeAllBodiesToGpu();
+		bp->writeAabbsToGpu();
+
 
     }
 };

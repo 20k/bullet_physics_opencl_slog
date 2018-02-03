@@ -33,6 +33,7 @@
 			<Add directory="deps" />
 		</Compiler>
 		<Linker>
+			<Add option="-lBullet3OpenCL_clew" />
 			<Add option="-lbullet3collision" />
 			<Add option="-lbullet3common" />
 			<Add option="-lbullet3dynamics" />
