@@ -64,7 +64,6 @@ __kernel void
 	}
 }
 
-///50% of the work items here are doing nothing
 __kernel
 void hacky_render(__read_only image2d_t tex, __write_only image2d_t screen, __global Body* gBodies, int max_bodies)
 {
@@ -72,17 +71,17 @@ void hacky_render(__read_only image2d_t tex, __write_only image2d_t screen, __gl
 
     int2 dim = get_image_dim(tex);
 
-    int2 id;
-    id.x = idx % dim.x;
-    id.y = idx / dim.x;
-
-    if(any(id < 0) || any(id >= dim))
+    if(idx >= dim.x * dim.y)
         return;
 
     int body_idx = get_global_id(1);
 
     if(body_idx >= max_bodies)
         return;
+
+    int2 id;
+    id.x = idx % dim.x;
+    id.y = idx / dim.x;
 
     sampler_t sam_near = CLK_NORMALIZED_COORDS_FALSE |
                     CLK_ADDRESS_NONE |
@@ -343,7 +342,9 @@ struct opencl_base
 
         for(int i=0; i < 5000; i++)
         {
-            make_sphere(10.f, randf<3, float>(0, 600), radius/2, index);
+            //make_sphere(10.f, randf<3, float>(0, 600), radius/2, index);
+
+            make_cube(10.f, randf<3, float>(0, 600), radius, index);
         }
 
         //make_plane(0.f, {0, 0, 0}, 1.f, {0, 1, 0}, index);
@@ -441,24 +442,18 @@ struct opencl_base
 
         int num_objects = m_data->m_rigidBodyPipeline->getNumBodies();
 
-        //printf("%i nobj\n", num_objects);
-
         if(num_objects)
         {
             cl_mem buffer = m_data->m_rigidBodyPipeline->getBodyBuffer();
 
-            //for(int i=0; i < num_objects; i++)
-            {
-                cl::args args;
-                args.arg_list.reserve(4);
-                args.push_back(circle_tex);
-                args.push_back(screen_tex);
-                args.push_back(buffer);
-                args.push_back(num_objects);
-                //args.push_back(i);
+            cl::args args;
+            args.arg_list.reserve(4);
+            args.push_back(circle_tex);
+            args.push_back(screen_tex);
+            args.push_back(buffer);
+            args.push_back(num_objects);
 
-                cqueue.exec(program, "hacky_render", args, {circle_tex->w * circle_tex->h, num_objects}, {16, 16});
-            }
+            cqueue.exec(program, "hacky_render", args, {circle_tex->w * circle_tex->h, num_objects}, {16, 16});
 
 
             /*npData->m_bodyBufferGPU->copyToHost(*npData->m_bodyBufferCPU);
@@ -505,7 +500,7 @@ int main()
 
 
     opencl_base base;
-    base.initCL(ctx, phys, prog);
+    base.initCL(ctx, cqueue, prog);
 
     sf::RenderTexture tex;
     tex.create(10, 10);
