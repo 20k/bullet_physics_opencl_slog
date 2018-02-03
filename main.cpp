@@ -49,7 +49,7 @@ typedef struct
 	float4 m_angVel;
 	unsigned int m_collidableIdx;
 	float m_invMass;
-	float m_restituitionCoeff;
+	float m_restituitionCoeff; ///aha, here you are! TODO: FOUND RESISTUTION
 	float m_frictionCoeff;
 } Body;
 
@@ -62,6 +62,30 @@ __kernel void
 		posOrnColor[nodeID] = (float4) (gBodies[nodeID].m_pos.xyz,1.0);
 		posOrnColor[nodeID + numNodes] = gBodies[nodeID].m_quat;
 	}
+}
+
+__kernel
+void hacky_render(__read_only image2d_t tex, __write_only image2d_t screen, __global Body* gBodies, int body_idx)
+{
+    int2 id;
+    id.x = get_global_id(0);
+    id.y = get_global_id(1);
+
+    int2 dim = get_image_dim(tex);
+
+    if(any(id < 0) || any(id >= dim))
+        return;
+
+    sampler_t sam_near = CLK_NORMALIZED_COORDS_FALSE |
+                    CLK_ADDRESS_NONE |
+                    CLK_FILTER_NEAREST;
+
+    int4 val = read_imagei(tex, sam_near, id);
+
+    int2 pos = convert_int2(gBodies[body_idx].m_pos.xy);
+
+    ///check this works
+    write_imagef(screen, convert_int2(id + pos), convert_float4(val) / 255.f);
 }
 );
 
@@ -213,16 +237,11 @@ struct opencl_base
         index++;
     }
 
-    void initCL()
+    void initCL(cl::context& ctx, cl::command_queue& cqueue, cl::program& prog)
     {
         m_clData = new GpuDemoInternalData();
 
         m_data = new session_data;
-
-        b3OpenCLUtils_clewInit();
-
-        cl::context ctx;
-        cl::command_queue cqueue(ctx);
 
         m_clData->m_clContext = ctx.ccontext;
         m_clData->m_platformId = ctx.platform;
@@ -233,9 +252,6 @@ struct opencl_base
         m_clData->m_clDeviceName = "PhonyDevice";
 
         int errNum = 0;
-
-        cl::program prog(ctx, s_rigidBodyKernelString, false);
-        prog.build_with(ctx, "");
 
         cl::kernel copyTransformsToVBOKernel(prog, "copyTransformsToVBOKernel");
 
@@ -282,7 +298,7 @@ struct opencl_base
 
         for(int i=0; i < 50; i++)
         {
-            make_sphere(1.f, {i * 2 + 400, 600, 0.f}, 1.f, index);
+            make_sphere(1.f, {i * 2 + 400, 600, 0.f}, 21.f, index);
         }
 
         make_cube(0.f, {0,0,0}, {4000, 1, 4000}, index);
@@ -357,8 +373,13 @@ struct opencl_base
 
     }
 
-    void render(sf::RenderWindow& win)
+    void render(sf::RenderWindow& win, cl::cl_gl_interop_texture* circle_tex, cl::cl_gl_interop_texture* screen_tex, cl::command_queue& cqueue, cl::program& program)
     {
+        screen_tex->acquire(cqueue);
+        circle_tex->acquire(cqueue);
+
+        screen_tex->clear_to_zero(cqueue);
+
         int num_objects = m_data->m_rigidBodyPipeline->getNumBodies();
 
         printf("%i nobj\n", num_objects);
@@ -366,14 +387,29 @@ struct opencl_base
         if(num_objects)
         {
             b3GpuNarrowPhaseInternalData*	npData = m_data->m_np->getInternalData();
-            npData->m_bodyBufferGPU->copyToHost(*npData->m_bodyBufferCPU);
+
+            cl_mem buffer = m_data->m_rigidBodyPipeline->getBodyBuffer();
+
+            for(int i=0; i < num_objects; i++)
+            {
+                cl::args args;
+                args.push_back(circle_tex);
+                args.push_back(screen_tex);
+                args.push_back(buffer);
+                args.push_back(i);
+
+                cqueue.exec(program, "hacky_render", args, {10, 10}, {16, 16});
+            }
+
+
+            /*npData->m_bodyBufferGPU->copyToHost(*npData->m_bodyBufferCPU);
 
             sf::CircleShape circle;
             float radius = 5;
             circle.setRadius(radius);
-            circle.setOrigin(radius, radius);
+            circle.setOrigin(radius, radius);*/
 
-            for(int i=0; i < num_objects; i++)
+            /*for(int i=0; i < num_objects; i++)
             {
                 b3Vector4 pos = (const b3Vector4&)npData->m_bodyBufferCPU->at(i).m_pos;
 
@@ -383,7 +419,9 @@ struct opencl_base
                 circle.setPosition(sf::Vector2f(pos.x, pos.y));
 
                 win.draw(circle);
-            }
+
+                //circle.
+            }*/
         }
     }
 };
@@ -395,8 +433,46 @@ int main()
 
     sf::RenderWindow win(sf::VideoMode(800, 600), "openclfun");
 
+    b3OpenCLUtils_clewInit();
+
+    cl::context ctx;
+    cl::command_queue cqueue(ctx);
+
+
+    cl::program prog(ctx, s_rigidBodyKernelString, false);
+    prog.build_with(ctx, "");
+
+
     opencl_base base;
-    base.initCL();
+    base.initCL(ctx, cqueue, prog);
+
+    sf::RenderTexture tex;
+    tex.create(10, 10);
+
+    sf::CircleShape shape;
+    shape.setRadius(5.f);
+
+    shape.setPosition(5, 5);
+    shape.setOrigin(5, 5);
+
+    tex.setActive(true);
+    tex.draw(shape);
+    tex.display();
+
+
+    const sf::Texture& ctex = tex.getTexture();
+
+    unsigned int glid = ctex.getNativeHandle();
+
+    cl::buffer_manager buffer_manage;
+
+    //cl::cl_gl_interop_texture* interop =
+
+    cl::cl_gl_interop_texture* circletex = buffer_manage.fetch<cl::cl_gl_interop_texture>(ctx, nullptr, (GLuint)glid);
+    circletex->acquire(cqueue);
+
+    cl::cl_gl_interop_texture* screen_tex = buffer_manage.fetch<cl::cl_gl_interop_texture>(ctx, nullptr, win.getSize().x, win.getSize().y);
+    screen_tex->acquire(cqueue);
 
     sf::Clock clk;
     sf::Keyboard key;
@@ -415,7 +491,9 @@ int main()
 
         base.tick(timestep_s);
 
-        base.render(win);
+        base.render(win, circletex, screen_tex, cqueue, prog);
+
+        screen_tex->gl_blit_me(0, cqueue);
 
         if(key.isKeyPressed(sf::Keyboard::N))
         {
