@@ -174,25 +174,37 @@ struct opencl_base
 
     }
 
-    void make_cube(float mass, vec3f pos, int& index)
+    void make_cube(float mass, vec3f pos, vec3f full_extents, int& index)
     {
+        vec3f half_extents = full_extents / 2.f;
+
         int strideInBytes = 9 * sizeof(float);
         int numVertices = sizeof(cube_vertices) / strideInBytes;
         int numIndices = sizeof(cube_indices) / sizeof(int);
 
-        b3Vector4 scaling = b3MakeVector4(4000,1.,4000,1);
+        b3Vector4 scaling = b3MakeVector4(half_extents.x(), half_extents.y(), half_extents.z(), 1);
 
         int colIndex = m_data->m_np->registerConvexHullShape(cube_vertices, strideInBytes, numVertices, scaling);
 
-
-        b3ConvexUtility
-
-        m_data->m_np->registerConvexHullShape(b3ConvexUtility)
-
-        b3Vector3 position = b3MakeVector3(0,4,0);
+        b3Vector3 position = b3MakeVector3(pos.x(), pos.y(), pos.z());
         b3Quaternion orn(0,0,0,1);
 
         int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(0.f,position,orn,colIndex,index,false);
+
+        index++;
+    }
+
+    void make_sphere(float mass, vec3f pos, float radius, int& index)
+    {
+        int colIndex = m_data->m_np->registerSphereShape(radius);
+
+        b3Vector3 position = b3MakeVector3(pos.x(), pos.y(), pos.z());
+
+        b3Quaternion orn(0,0,0,1);
+
+        b3Vector4 scaling = b3MakeVector4(radius, radius, radius, 1.f);
+
+        int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(mass, position, orn, colIndex, index, false);
 
         index++;
     }
@@ -266,20 +278,7 @@ struct opencl_base
 
         for(int i=0; i < 50; i++)
         {
-            float rad = 1.f;
-            float mass = 1.f;
-
-            int colIndex = m_data->m_np->registerSphereShape(rad);
-
-            b3Vector3 position = b3MakeVector3(i * 2 + 500, 600,0);
-
-            b3Quaternion orn(0,0,0,1);
-
-            b3Vector4 scaling = b3MakeVector4(rad, rad, rad, 1.f);
-
-            int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(mass, position, orn, colIndex, index, false);
-
-            index++;
+            make_sphere(1.f, {i * 2 + 400, 600, 0.f}, 1.f, index);
         }
 
         /*int colIndex = m_data->m_np->registerSphereShape(100.f);
@@ -292,7 +291,7 @@ struct opencl_base
 
         m_data->m_rigidBodyPipeline->registerPhysicsInstance(0.f, position, orn, colIndex, index + 1, false);*/
 
-        make_cube(0.f, {0,0,0}, index);
+        make_cube(0.f, {0,0,0}, {4000, 1, 4000}, index);
 
         m_data->m_rigidBodyPipeline->writeAllInstancesToGpu();
 		np->writeAllBodiesToGpu();
