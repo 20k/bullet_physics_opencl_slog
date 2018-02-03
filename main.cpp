@@ -174,6 +174,10 @@ struct opencl_base
 
     }
 
+    ///ok. need to find a way to lock these to vertical
+    ///or... maybe just cheese it and literally keep setting the positions and velocities to 0
+    ///there's no way z velocity should be introduced so should be fine
+    ///right?
     void make_cube(float mass, vec3f pos, vec3f full_extents, int& index)
     {
         vec3f half_extents = full_extents / 2.f;
@@ -301,6 +305,8 @@ struct opencl_base
 
         ///tragically its now my understand of how opengl interacts
         ///with opencl for matrices that's now the limiting factor
+        ///alright, given that this is gunna be complicated just do the stupid thing instead
+        ///aka use opencl to render textures
         /*if(num_objects)
         {
             if (convertOnCpu)
