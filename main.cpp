@@ -167,6 +167,7 @@ struct opencl_base
         b3GpuNarrowPhase* np = new b3GpuNarrowPhase(m_clData->m_clContext,m_clData->m_clDevice,m_clData->m_clQueue,m_data->m_config);
 		b3GpuBroadphaseInterface* bp =0;
 
+
 		bool useUniformGrid = false;
 
 		if (useUniformGrid)
@@ -183,6 +184,11 @@ struct opencl_base
 
 		m_data->m_rigidBodyPipeline = new b3GpuRigidBodyPipeline(m_clData->m_clContext,m_clData->m_clDevice,m_clData->m_clQueue, np, bp,m_data->m_broadphaseDbvt,m_data->m_config);
 
+		b3Vector3 gravity = b3MakeVector3(0, -9.8, 0);
+
+        m_data->m_rigidBodyPipeline->setGravity(gravity);
+
+
 		setupScene();
 
 		m_data->m_rigidBodyPipeline->writeAllInstancesToGpu();
@@ -190,6 +196,107 @@ struct opencl_base
 		bp->writeAabbsToGpu();
 
 
+        int index = 0;
+
+
+        {
+            float rad = 5.f;
+            float mass = 1.f;
+
+            int colIndex = m_data->m_np->registerSphereShape(rad);
+
+            b3Vector3 position = b3MakeVector3(0,0,0);
+
+            b3Quaternion orn(0,0,0,1);
+
+            b3Vector4 scaling = b3MakeVector4(rad, rad, rad, 1.f);
+
+            int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(mass, position, orn, colIndex, index, false);
+
+            index++;
+        }
+
+
+        m_data->m_rigidBodyPipeline->writeAllInstancesToGpu();
+		np->writeAllBodiesToGpu();
+		bp->writeAabbsToGpu();
+    }
+
+    void tick(double timestep_s)
+    {
+        int num_objects = m_data->m_rigidBodyPipeline->getNumBodies();
+
+        {
+            B3_PROFILE("stepSimulation");
+            m_data->m_rigidBodyPipeline->stepSimulation(1./60.f);
+        }
+
+        bool convertOnCpu = false;
+
+        /*if(num_objects)
+        {
+            if (convertOnCpu)
+            {
+                b3GpuNarrowPhaseInternalData*	npData = m_data->m_np->getInternalData();
+                npData->m_bodyBufferGPU->copyToHost(*npData->m_bodyBufferCPU);
+
+                b3AlignedObjectArray<b3Vector4> vboCPU;
+                m_data->m_instancePosOrnColor->copyToHost(vboCPU);
+
+                for (int i=0;i<num_objects;i++)
+                {
+                    b3Vector4 pos = (const b3Vector4&)npData->m_bodyBufferCPU->at(i).m_pos;
+                    b3Quat orn = npData->m_bodyBufferCPU->at(i).m_quat;
+                    pos.w = 1.f;
+                    vboCPU[i] = pos;
+                    vboCPU[i + num_objects] = (b3Vector4&)orn;
+                }
+                m_data->m_instancePosOrnColor->copyFromHost(vboCPU);
+
+            } else
+            {
+                B3_PROFILE("cl2gl_convert");
+                int ciErrNum = 0;
+                cl_mem bodies = m_data->m_rigidBodyPipeline->getBodyBuffer();
+                b3LauncherCL launch(m_clData->m_clQueue,m_data->m_copyTransformsToVBOKernel,"m_copyTransformsToVBOKernel");
+                launch.setBuffer(bodies);
+                launch.setBuffer(m_data->m_instancePosOrnColor->getBufferCL());
+                launch.setConst(num_objects);
+                launch.launch1D(num_objects);
+                oclCHECKERROR(ciErrNum, CL_SUCCESS);
+            }
+        }*/
+
+        printf("%i nobj\n", num_objects);
+
+        if(num_objects)
+        {
+            b3GpuNarrowPhaseInternalData*	npData = m_data->m_np->getInternalData();
+            npData->m_bodyBufferGPU->copyToHost(*npData->m_bodyBufferCPU);
+
+            for(int i=0; i < num_objects; i++)
+            {
+                b3Vector4 pos = (const b3Vector4&)npData->m_bodyBufferCPU->at(i).m_pos;
+
+                printf("%f %f %f\n", pos.x, pos.y, pos.z);
+            }
+
+            /*b3AlignedObjectArray<b3Vector4> vboCPU;
+            m_data->m_instancePosOrnColor->copyToHost(vboCPU);
+
+            for (int i=0;i<num_objects;i++)
+            {
+                b3Vector4 pos = (const b3Vector4&)npData->m_bodyBufferCPU->at(i).m_pos;
+                b3Quat orn = npData->m_bodyBufferCPU->at(i).m_quat;
+                pos.w = 1.f;
+                vboCPU[i] = pos;
+                vboCPU[i + num_objects] = (b3Vector4&)orn;
+            }
+            m_data->m_instancePosOrnColor->copyFromHost(vboCPU);*/
+
+
+
+        }
     }
 };
 
@@ -203,4 +310,29 @@ int main()
     opencl_base base;
     base.initCL();
 
+    sf::Clock clk;
+    sf::Keyboard key;
+
+    while(win.isOpen())
+    {
+        sf::Event event;
+
+        while(win.pollEvent(event))
+        {
+            if(event.type == sf::Event::Closed)
+                win.close();
+        }
+
+        double timestep_s = clk.restart().asMicroseconds() / 1000. / 1000.;
+
+        base.tick(timestep_s);
+
+        if(key.isKeyPressed(sf::Keyboard::N))
+        {
+            std::cout << timestep_s << std::endl;
+        }
+
+        win.display();
+        win.clear();
+    }
 }
