@@ -195,17 +195,16 @@ struct opencl_base
 		np->writeAllBodiesToGpu();
 		bp->writeAabbsToGpu();
 
-
         int index = 0;
 
-
+        for(int i=0; i < 5; i++)
         {
             float rad = 5.f;
             float mass = 1.f;
 
             int colIndex = m_data->m_np->registerSphereShape(rad);
 
-            b3Vector3 position = b3MakeVector3(0,0,0);
+            b3Vector3 position = b3MakeVector3(i * 20 + 500,600,0);
 
             b3Quaternion orn(0,0,0,1);
 
@@ -228,7 +227,7 @@ struct opencl_base
 
         {
             B3_PROFILE("stepSimulation");
-            m_data->m_rigidBodyPipeline->stepSimulation(1./60.f);
+            m_data->m_rigidBodyPipeline->stepSimulation(timestep_s);
         }
 
         bool convertOnCpu = false;
@@ -267,19 +266,6 @@ struct opencl_base
             }
         }*/
 
-        printf("%i nobj\n", num_objects);
-
-        if(num_objects)
-        {
-            b3GpuNarrowPhaseInternalData*	npData = m_data->m_np->getInternalData();
-            npData->m_bodyBufferGPU->copyToHost(*npData->m_bodyBufferCPU);
-
-            for(int i=0; i < num_objects; i++)
-            {
-                b3Vector4 pos = (const b3Vector4&)npData->m_bodyBufferCPU->at(i).m_pos;
-
-                printf("%f %f %f\n", pos.x, pos.y, pos.z);
-            }
 
             /*b3AlignedObjectArray<b3Vector4> vboCPU;
             m_data->m_instancePosOrnColor->copyToHost(vboCPU);
@@ -294,8 +280,35 @@ struct opencl_base
             }
             m_data->m_instancePosOrnColor->copyFromHost(vboCPU);*/
 
+    }
 
+    void render(sf::RenderWindow& win)
+    {
+        int num_objects = m_data->m_rigidBodyPipeline->getNumBodies();
 
+        printf("%i nobj\n", num_objects);
+
+        if(num_objects)
+        {
+            b3GpuNarrowPhaseInternalData*	npData = m_data->m_np->getInternalData();
+            npData->m_bodyBufferGPU->copyToHost(*npData->m_bodyBufferCPU);
+
+            for(int i=0; i < num_objects; i++)
+            {
+                b3Vector4 pos = (const b3Vector4&)npData->m_bodyBufferCPU->at(i).m_pos;
+
+                printf("%f %f %f\n", pos.x, pos.y, pos.z);
+
+                float radius = 5;
+
+                sf::CircleShape circle;
+                circle.setRadius(radius);
+
+                circle.setPosition(sf::Vector2f(pos.x, pos.y));
+                circle.setOrigin(radius, radius);
+
+                win.draw(circle);
+            }
         }
     }
 };
@@ -326,6 +339,8 @@ int main()
         double timestep_s = clk.restart().asMicroseconds() / 1000. / 1000.;
 
         base.tick(timestep_s);
+
+        base.render(win);
 
         if(key.isKeyPressed(sf::Keyboard::N))
         {
