@@ -281,16 +281,6 @@ struct opencl_base
             make_sphere(1.f, {i * 2 + 400, 600, 0.f}, 1.f, index);
         }
 
-        /*int colIndex = m_data->m_np->registerSphereShape(100.f);
-
-        b3Vector3 position = b3MakeVector3(500, 0, 0);
-
-        b3Quaternion orn(0,0,0,1);
-
-        b3Vector4 scaling = b3MakeVector4(100, 100, 100, 1.f);
-
-        m_data->m_rigidBodyPipeline->registerPhysicsInstance(0.f, position, orn, colIndex, index + 1, false);*/
-
         make_cube(0.f, {0,0,0}, {4000, 1, 4000}, index);
 
         m_data->m_rigidBodyPipeline->writeAllInstancesToGpu();
@@ -309,6 +299,8 @@ struct opencl_base
 
         bool convertOnCpu = false;
 
+        ///tragically its now my understand of how opengl interacts
+        ///with opencl for matrices that's now the limiting factor
         /*if(num_objects)
         {
             if (convertOnCpu)
