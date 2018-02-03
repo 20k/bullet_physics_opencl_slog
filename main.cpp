@@ -64,18 +64,24 @@ __kernel void
 	}
 }
 
+///50% of the work items here are doing nothing
 __kernel
-void hacky_render(__read_only image2d_t tex, __write_only image2d_t screen, __global Body* gBodies)
+void hacky_render(__read_only image2d_t tex, __write_only image2d_t screen, __global Body* gBodies, int max_bodies)
 {
-    int2 id;
-    id.x = get_global_id(0);
-    id.y = get_global_id(1);
-
-    int body_idx = get_global_id(2);
+    int idx = get_global_id(0);
 
     int2 dim = get_image_dim(tex);
 
+    int2 id;
+    id.x = idx % dim.x;
+    id.y = idx / dim.x;
+
     if(any(id < 0) || any(id >= dim))
+        return;
+
+    int body_idx = get_global_id(1);
+
+    if(body_idx >= max_bodies)
         return;
 
     sampler_t sam_near = CLK_NORMALIZED_COORDS_FALSE |
@@ -444,13 +450,14 @@ struct opencl_base
             //for(int i=0; i < num_objects; i++)
             {
                 cl::args args;
-                args.arg_list.reserve(3);
+                args.arg_list.reserve(4);
                 args.push_back(circle_tex);
                 args.push_back(screen_tex);
                 args.push_back(buffer);
+                args.push_back(num_objects);
                 //args.push_back(i);
 
-                cqueue.exec(program, "hacky_render", args, {10, 10, num_objects}, {16, 16, 1});
+                cqueue.exec(program, "hacky_render", args, {circle_tex->w * circle_tex->h, num_objects}, {16, 16});
             }
 
 
