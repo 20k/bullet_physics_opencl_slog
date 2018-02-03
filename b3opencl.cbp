@@ -30,13 +30,13 @@
 		</Build>
 		<Compiler>
 			<Add option="-Wall" />
+			<Add directory="deps" />
 		</Compiler>
 		<Linker>
 			<Add option="-lbullet3collision" />
 			<Add option="-lbullet3common" />
 			<Add option="-lbullet3dynamics" />
 			<Add option="-lbullet3geometry" />
-			<Add option="-lbullet3opencl_clew" />
 			<Add option="-lopengl32" />
 			<Add option="-lglew64.dll" />
 			<Add option="-lopencl" />
@@ -44,6 +44,10 @@
 			<Add option="-lsfml-window" />
 			<Add option="-lsfml-graphics" />
 		</Linker>
+		<Unit filename="deps/ocl/logging.cpp" />
+		<Unit filename="deps/ocl/logging.hpp" />
+		<Unit filename="deps/ocl/ocl.cpp" />
+		<Unit filename="deps/ocl/ocl.hpp" />
 		<Unit filename="main.cpp" />
 		<Extensions>
 			<code_completion />
