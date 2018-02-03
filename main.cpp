@@ -118,6 +118,51 @@ int gGpuArraySizeZ = 45;
 
 extern int b3OpenCLUtils_clewInit();
 
+///position xyz, unused w, normal, uv
+static const float cube_vertices[] =
+{
+	-1.0f, -1.0f, 1.0f, 1.0f,	0,0,1,	0,0,//0
+	1.0f, -1.0f, 1.0f, 1.0f,	0,0,1,	1,0,//1
+	1.0f,  1.0f, 1.0f, 1.0f,	0,0,1,	1,1,//2
+	-1.0f,  1.0f, 1.0f, 1.0f,	0,0,1,	0,1	,//3
+
+	-1.0f, -1.0f, -1.0f, 1.0f,	0,0,-1,	0,0,//4
+	1.0f, -1.0f, -1.0f, 1.0f,	0,0,-1,	1,0,//5
+	1.0f,  1.0f, -1.0f, 1.0f,	0,0,-1,	1,1,//6
+	-1.0f,  1.0f, -1.0f, 1.0f,	0,0,-1,	0,1,//7
+
+	-1.0f, -1.0f, -1.0f, 1.0f,	-1,0,0,	0,0,
+	-1.0f, 1.0f, -1.0f, 1.0f,	-1,0,0,	1,0,
+	-1.0f,  1.0f, 1.0f, 1.0f,	-1,0,0,	1,1,
+	-1.0f,  -1.0f, 1.0f, 1.0f,	-1,0,0,	0,1,
+
+	1.0f, -1.0f, -1.0f, 1.0f,	1,0,0,	0,0,
+	1.0f, 1.0f, -1.0f, 1.0f,	1,0,0,	1,0,
+	1.0f,  1.0f, 1.0f, 1.0f,	1,0,0,	1,1,
+	1.0f,  -1.0f, 1.0f, 1.0f,	1,0,0,	0,1,
+
+	-1.0f, -1.0f,  -1.0f, 1.0f,	0,-1,0,	0,0,
+	-1.0f, -1.0f, 1.0f, 1.0f,	0,-1,0,	1,0,
+	1.0f, -1.0f,  1.0f, 1.0f,	0,-1,0,	1,1,
+	1.0f,-1.0f,  -1.0f,  1.0f,	0,-1,0,	0,1,
+
+	-1.0f, 1.0f,  -1.0f, 1.0f,	0,1,0,	0,0,
+	-1.0f, 1.0f, 1.0f, 1.0f,	0,1,0,	1,0,
+	1.0f, 1.0f,  1.0f, 1.0f,	0,1,0,	1,1,
+	1.0f,1.0f,  -1.0f,  1.0f,	0,1,0,	0,1,
+};
+
+
+static const int cube_indices[]=
+{
+	0,1,2,0,2,3,//ground face
+	6,5,4,7,6,4,//top face
+	10,9,8,11,10,8,
+	12,13,14,12,14,15,
+	18,17,16,19,18,16,
+	20,21,22,20,22,23
+};
+
 struct opencl_base
 {
     struct GpuDemoInternalData*	m_clData;
@@ -127,6 +172,24 @@ struct opencl_base
     void setupScene()
     {
 
+    }
+
+    void make_cube(float mass, vec3f pos, int& index)
+    {
+        int strideInBytes = 9 * sizeof(float);
+        int numVertices = sizeof(cube_vertices) / strideInBytes;
+        int numIndices = sizeof(cube_indices) / sizeof(int);
+
+        b3Vector4 scaling = b3MakeVector4(4000,1.,4000,1);
+
+        int colIndex = m_data->m_np->registerConvexHullShape(cube_vertices, strideInBytes, numVertices, scaling);
+
+        b3Vector3 position = b3MakeVector3(0,4,0);
+        b3Quaternion orn(0,0,0,1);
+
+        int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(0.f,position,orn,colIndex,index,false);
+
+        index++;
     }
 
     void initCL()
@@ -215,7 +278,7 @@ struct opencl_base
             index++;
         }
 
-        int colIndex = m_data->m_np->registerSphereShape(100.f);
+        /*int colIndex = m_data->m_np->registerSphereShape(100.f);
 
         b3Vector3 position = b3MakeVector3(500, 0, 0);
 
@@ -223,7 +286,9 @@ struct opencl_base
 
         b3Vector4 scaling = b3MakeVector4(100, 100, 100, 1.f);
 
-        m_data->m_rigidBodyPipeline->registerPhysicsInstance(0.f, position, orn, colIndex, index + 1, false);
+        m_data->m_rigidBodyPipeline->registerPhysicsInstance(0.f, position, orn, colIndex, index + 1, false);*/
+
+        make_cube(0.f, {0,0,0}, index);
 
         m_data->m_rigidBodyPipeline->writeAllInstancesToGpu();
 		np->writeAllBodiesToGpu();
