@@ -184,6 +184,11 @@ struct opencl_base
 
         int colIndex = m_data->m_np->registerConvexHullShape(cube_vertices, strideInBytes, numVertices, scaling);
 
+
+        b3ConvexUtility
+
+        m_data->m_np->registerConvexHullShape(b3ConvexUtility)
+
         b3Vector3 position = b3MakeVector3(0,4,0);
         b3Quaternion orn(0,0,0,1);
 
@@ -250,7 +255,6 @@ struct opencl_base
 		b3Vector3 gravity = b3MakeVector3(0, -9.8, 0);
 
         m_data->m_rigidBodyPipeline->setGravity(gravity);
-
 
 		setupScene();
 
