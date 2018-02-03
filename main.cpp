@@ -93,6 +93,9 @@ void hacky_render(__read_only image2d_t tex, __write_only image2d_t screen, __gl
     if(any(offset < 0) || any(offset >= sdim))
         return;
 
+    if(val.w == 0)
+        return;
+
     ///check this works
     write_imagef(screen, offset, convert_float4(val) / 255.f);
 }
@@ -223,27 +226,21 @@ struct opencl_base
 
         int colIndex = m_data->m_np->registerConvexHullShape(cube_vertices, strideInBytes, numVertices, scaling);
 
-        b3Vector3 position = b3MakeVector3(pos.x(), pos.y(), pos.z());
+        /*b3Vector3 position = b3MakeVector3(pos.x(), pos.y(), pos.z());
         b3Quaternion orn(0,0,0,1);
 
         int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(mass,position,orn,colIndex,-1,false);
 
-        index++;
+        index++;*/
+
+        make_obj(mass, pos, half_extents, index, colIndex);
     }
 
     void make_sphere(float mass, vec3f pos, float radius, int& index)
     {
         int colIndex = m_data->m_np->registerSphereShape(radius);
 
-        b3Vector3 position = b3MakeVector3(pos.x(), pos.y(), pos.z());
-
-        b3Quaternion orn(0,0,0,1);
-
-        b3Vector4 scaling = b3MakeVector4(radius, radius, radius, 1.f);
-
-        int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(mass, position, orn, colIndex, -1, false);
-
-        index++;
+        make_obj(mass, pos, radius, index, colIndex);
     }
 
     void make_plane(float mass, vec3f pos, float plane_constant, vec3f normal, int& index)
