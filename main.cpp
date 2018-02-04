@@ -49,7 +49,7 @@ typedef struct
 	float4 m_angVel;
 	unsigned int m_collidableIdx;
 	float m_invMass;
-	float m_restituitionCoeff; ///aha, here you are! TODO: FOUND RESISTUTION
+	float m_restituitionCoeff; ///aha, here you are! TODO: FOUND RESTITUTION
 	float m_frictionCoeff;
 } Body;
 
@@ -193,17 +193,6 @@ static const float cube_vertices[] =
 	1.0f,1.0f,  -1.0f,  1.0f,	0,1,0,	0,1,
 };
 
-
-static const int cube_indices[]=
-{
-	0,1,2,0,2,3,//ground face
-	6,5,4,7,6,4,//top face
-	10,9,8,11,10,8,
-	12,13,14,12,14,15,
-	18,17,16,19,18,16,
-	20,21,22,20,22,23
-};
-
 struct opencl_base
 {
     struct GpuDemoInternalData*	m_clData;
@@ -225,18 +214,10 @@ struct opencl_base
 
         int strideInBytes = 9 * sizeof(float);
         int numVertices = sizeof(cube_vertices) / strideInBytes;
-        int numIndices = sizeof(cube_indices) / sizeof(int);
 
         b3Vector4 scaling = b3MakeVector4(half_extents.x(), half_extents.y(), half_extents.z(), 1);
 
         int colIndex = m_data->m_np->registerConvexHullShape(cube_vertices, strideInBytes, numVertices, scaling);
-
-        /*b3Vector3 position = b3MakeVector3(pos.x(), pos.y(), pos.z());
-        b3Quaternion orn(0,0,0,1);
-
-        int pid = m_data->m_rigidBodyPipeline->registerPhysicsInstance(mass,position,orn,colIndex,-1,false);
-
-        index++;*/
 
         make_obj(mass, pos, half_extents, index, colIndex);
     }
@@ -299,7 +280,7 @@ struct opencl_base
 		b3GpuBroadphaseInterface* bp =0;
 
 
-		bool useUniformGrid = true;
+		bool useUniformGrid = false;
 
 		if (useUniformGrid)
 		{
@@ -327,7 +308,7 @@ struct opencl_base
 
         int index = 0;
 
-        float radius = 1.f;
+        float radius = 5.f;
 
         /*int colIndex = m_data->m_np->registerSphereShape(radius);
 
@@ -340,11 +321,16 @@ struct opencl_base
             make_obj(1.f, randv<3, float>(0, 600), radius, index, colIndex);
         }*/
 
-        for(int i=0; i < 5000; i++)
+        for(int i=0; i < 500; i++)
         {
             //make_sphere(10.f, randf<3, float>(0, 600), radius/2, index);
 
-            make_cube(10.f, randf<3, float>(0, 600), radius, index);
+            vec3f pos = randf<3, float>(0, 600);
+            pos.z() = 0;
+
+            make_sphere(1.f,pos, radius, index);
+
+            //make_cube(10.f, pos, radius, index);
         }
 
         //make_plane(0.f, {0, 0, 0}, 1.f, {0, 1, 0}, index);
@@ -362,7 +348,7 @@ struct opencl_base
             }
         }
 
-        //make_cube(0.f, {0,0,0}, {4000, 1, 4000}, index);
+        make_cube(0.f, {0,0,0}, {4000, 1, 4000}, index);
 
         m_data->m_rigidBodyPipeline->writeAllInstancesToGpu();
 		np->writeAllBodiesToGpu();
@@ -374,6 +360,11 @@ struct opencl_base
         int num_objects = m_data->m_rigidBodyPipeline->getNumBodies();
 
         {
+            ///so
+            ///as far as i can tell this does not do fixed timestep substepping
+            ///this is '''fine''' for the moment, but really i want to implement fixed timesteps
+            ///handle substepping manually
+            ///and perform interpolation, all on the gpu
             m_data->m_rigidBodyPipeline->stepSimulation(timestep_s);
         }
 
@@ -491,8 +482,6 @@ int main()
 
     cl::context ctx;
     cl::command_queue cqueue(ctx);
-
-    cl::command_queue phys(ctx);
 
 
     cl::program prog(ctx, s_rigidBodyKernelString, false);
